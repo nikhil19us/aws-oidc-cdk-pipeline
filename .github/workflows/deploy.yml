@@ -23,11 +23,11 @@ jobs:
           cache: pip
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
       - run: npm install -g aws-cdk
       - run: pip install -r requirements.txt
       - run: pytest -q
-      - run: cdk synth -c stage=dev -c account=111111111111 -c github_repo=${{ github.repository }} --quiet
+      - run: cdk synth -c stage=dev -c github_repo=${{ github.repository }} --quiet
 
   deploy-dev:
     # Runs once the repo variables from the README are set; until then the sample only tests.
@@ -40,7 +40,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - run: npm install -g aws-cdk && pip install -r requirements.txt
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -57,7 +57,7 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip }
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - run: npm install -g aws-cdk && pip install -r requirements.txt
       - uses: aws-actions/configure-aws-credentials@v4
         with:
