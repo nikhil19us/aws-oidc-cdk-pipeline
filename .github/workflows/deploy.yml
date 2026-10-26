@@ -1,0 +1,67 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  id-token: write   # lets the job request an OIDC token from GitHub
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install -g aws-cdk
+      - run: pip install -r requirements.txt
+      - run: pytest -q
+      - run: cdk synth -c stage=dev -c account=111111111111 -c github_repo=${{ github.repository }} --quiet
+
+  deploy-dev:
+    # Runs once the repo variables from the README are set; until then the sample only tests.
+    if: github.ref == 'refs/heads/main' && vars.DEV_DEPLOY_ROLE_ARN != ''
+    needs: test
+    runs-on: ubuntu-latest
+    environment: dev            # no reviewers: deploys on merge
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm install -g aws-cdk && pip install -r requirements.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEV_DEPLOY_ROLE_ARN }}   # no access keys stored anywhere
+          aws-region: ${{ env.AWS_REGION }}
+      - run: cdk deploy Service-dev -c stage=dev -c account=${{ vars.DEV_ACCOUNT_ID }} --require-approval never
+
+  deploy-prod:
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    environment: prod           # add required reviewers in repo settings: this is the approval gate
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12", cache: pip }
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - run: npm install -g aws-cdk && pip install -r requirements.txt
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.PROD_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - run: cdk diff Service-prod -c stage=prod -c account=${{ vars.PROD_ACCOUNT_ID }}
+      - run: cdk deploy Service-prod -c stage=prod -c account=${{ vars.PROD_ACCOUNT_ID }} --require-approval never
